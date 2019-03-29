@@ -25,6 +25,9 @@ type simpleClient struct {
 
 	// Quiet - if set don't print progress to stderr
 	Quiet bool
+
+	// SkipSSL - if set skips self signed certificate
+	SkipSSL bool
 }
 
 // Get makes a GET request, where r is the relative path, and rv is json.Unmarshalled to
@@ -32,8 +35,10 @@ func (sc *simpleClient) Get(r string, rv interface{}) error {
 	if !sc.Quiet {
 		log.Printf("GET %s%s", sc.API, r)
 	}
-        // Skip self-signed certificates
-	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	// Skip self-signed certificates
+	if sc.SkipSSL {
+		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
 	req, err := http.NewRequest(http.MethodGet, sc.API+r, nil)
 	if err != nil {
 		return err
@@ -113,7 +118,7 @@ type droplet struct {
 
 type reportUsers struct{}
 
-func newSimpleClient(cliConnection plugin.CliConnection, quiet bool) (*simpleClient, error) {
+func newSimpleClient(cliConnection plugin.CliConnection, quiet bool, skipssl bool) (*simpleClient, error) {
 	at, err := cliConnection.AccessToken()
 	if err != nil {
 		return nil, err
@@ -128,22 +133,25 @@ func newSimpleClient(cliConnection plugin.CliConnection, quiet bool) (*simpleCli
 		API:           api,
 		Authorization: at,
 		Quiet:         quiet,
+		SkipSSL:       skipssl,
 	}, nil
 }
 
 func (c *reportUsers) Run(cliConnection plugin.CliConnection, args []string) {
 	outputJSON := false
 	quiet := false
+	skipssl := false
 
 	fs := flag.NewFlagSet("report-users", flag.ExitOnError)
 	fs.BoolVar(&outputJSON, "output-json", false, "if set sends JSON to stdout instead of a rendered table")
 	fs.BoolVar(&quiet, "quiet", false, "if set suppressing printing of progress messages to stderr")
+	fs.BoolVar(&skipssl, "skipssl", false, "if set proceed with self signed certificate")
 	err := fs.Parse(args[1:])
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	client, err := newSimpleClient(cliConnection, quiet)
+	client, err := newSimpleClient(cliConnection, quiet, skipssl)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -253,6 +261,7 @@ func (c *reportUsers) GetMetadata() plugin.PluginMetadata {
 					Options: map[string]string{
 						"output-json": "if set sends JSON to stdout instead of a rendered table",
 						"quiet":       "if set suppresses printing of progress messages to stderr",
+						"skipssl":     "if set proceeds with self signed certificates",
 					},
 				},
 			},
