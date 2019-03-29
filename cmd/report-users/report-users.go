@@ -32,7 +32,7 @@ func (sc *simpleClient) Get(r string, rv interface{}) error {
 	if !sc.Quiet {
 		log.Printf("GET %s%s", sc.API, r)
 	}
-        // Added this line to authenticate against self-signed certificate 
+        // Skip self-signed certificates
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	req, err := http.NewRequest(http.MethodGet, sc.API+r, nil)
 	if err != nil {
